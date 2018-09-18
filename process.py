@@ -1,5 +1,8 @@
 from collections import Counter
+from scipy import spatial
 
+import numpy as np
+import math
 from nltk import RegexpTokenizer
 from nltk.corpus import stopwords
 
@@ -15,7 +18,7 @@ def read_input(filepath):
         book_number = int(lines[0].strip('\n'))
         book_titles = lines[1:book_number + 1]
         book_descriptions = lines[book_number + 2:]
-        return book_titles, book_descriptions
+        return book_titles, book_descriptions, book_number
 
 
 def process_titles(titles):
@@ -64,5 +67,71 @@ def process_descriptions(descriptions):
     return desc_features, unigrams, bows
 
 
-titles, descriptions = read_input("input/input00.txt")
-print(process_titles(titles))
+def build_feature_matrix(list_of_bags, features):
+    """
+    Using that function you are able to build the feature matrix.
+    :param list_of_bags: list of text bows
+    :return: feature matrix
+    """
+    feature_matrix = np.zeros((len(list_of_bags), len(features)))
+    for i in range(0, feature_matrix.shape[0]):
+        current_bow = list_of_bags[i]
+        for j in range(0, feature_matrix.shape[1]):
+            if features[j] in current_bow.keys():
+                feature_matrix[i, j] = current_bow[features[j]]
+            else:
+                feature_matrix[i, j] = 0
+    return feature_matrix
+
+
+def calculate_tfidf(list_of_bags, features):
+    """
+    Using that function we are able to calculate the tfidf feature matrix.
+    :param feature_matrix: tf feature matrix
+    :return: tfidf feature matrix
+    """
+    feature_matrix = build_feature_matrix(list_of_bags, features)
+    for j in range(0, feature_matrix.shape[1]):
+        term_df = np.count_nonzero(feature_matrix[:, j])
+        for i in range(0, feature_matrix.shape[0]):
+            temp_eq = math.log((1 + feature_matrix.shape[0]) / (1 + term_df)) + 1
+            feature_matrix[i, j] = feature_matrix[i, j] * temp_eq
+    return feature_matrix
+
+
+def _similarity(titles_matrix, desc_matrix):
+    """
+    The followign matrix calculates the
+    :param tfidif_matrix:
+    :return:
+    """
+    proposed_books = []
+    for i in range(0, desc_matrix.shape[0]):
+        description = desc_matrix[i, :]
+        similarity = 0
+        book = 0
+        for j in range(0, titles_matrix.shape[0]):
+            title = titles_matrix[j, :]
+            current_sim = 1 - spatial.distance.cosine(description, title)
+            if current_sim > similarity:
+                similarity = current_sim
+                book = j + 1
+        proposed_books.append(book)
+    return proposed_books
+
+
+def evaluate(output_file, predicted):
+    """
+    Using that function we evaluate our predictions
+    :param output_file: output file
+    :return:
+    """
+    with open(output_file, encoding="utf8", errors="ignore")  as file:
+        lines = file.readlines()
+        books = [int(ind.strip("\n")) for ind in lines]
+        counter = 0
+        for i in range(len(books)):
+            if books[i] == predicted[i]:
+                counter += 1
+        percentage = counter / len(books)
+        return percentage
